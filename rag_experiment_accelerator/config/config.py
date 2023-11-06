@@ -269,8 +269,12 @@ class Config:
     """
 
     def __init__(self, config_filename: str = "search_config.json") -> None:
-        with open(config_filename, "r") as json_file:
-            data = json.load(json_file)
+        config_json_files = [config_filename, "querying_config.json"]
+
+        data = {}
+        for config_file in config_json_files:  
+            with open(config_file, "r") as json_file:
+                data.update(json.load(json_file))
 
         self.CHUNK_SIZES = data["chunking"]["chunk_size"]
         self.OVERLAP_SIZES = data["chunking"]["overlap_size"]
@@ -292,16 +296,12 @@ class Config:
         self.DATA_FORMATS = data.get("data_formats", "all")
         self.METRIC_TYPES = data["metric_types"]
         self.LANGUAGE = data.get("language", {})
+        self.EVAL_DATA_JSON_FILE_PATH = data["eval_data_json_file_path"]
+        self.MAIN_PROMPT_INSTRUCTIONS = data["main_prompt_instruction"]        
         self.OpenAICredentials = OpenAICredentials.from_env()
         self.AzureSearchCredentials = AzureSearchCredentials.from_env()
         self.AzureMLCredentials = AzureMLCredentials.from_env()
         self._check_deployment()
-
-        with open("querying_config.json", "r") as json_file:
-            data = json.load(json_file)
-
-        self.EVAL_DATA_JSON_FILE_PATH = data["eval_data_json_file_path"]
-        self.MAIN_PROMPT_INSTRUCTIONS = data["main_prompt_instruction"]
 
     def _try_retrieve_model(self, model_name: str, tags: list[str]) -> openai.Model:
         """
