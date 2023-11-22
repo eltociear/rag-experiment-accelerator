@@ -68,7 +68,7 @@ def main(config: Config):
                                 "content_vector": generate_embedding(
                                     size=dimension,
                                     chunk=str(
-                                        pre_process.preprocess(docs.page_content)
+                                        docs.page_content
                                     ),
                                     model_name=config.EMBEDDING_MODEL_NAME,
                                 ),

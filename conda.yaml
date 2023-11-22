@@ -1,0 +1,57 @@
+name: prs-env
+channels:
+  - conda-forge
+dependencies:
+  - python=3.10.12
+  - pip
+  - pkg-config
+  - cmake
+  - mesa-libgl-cos6-x86_64
+  - tesseract
+  - poppler
+  - spacy
+  - spacy-model-en_core_web_md==3.5.0
+  - pip:
+    - PyPDF2~=2.0
+    - matplotlib
+    - plotly
+    - tiktoken
+    - openai
+    - spacy
+    - scikit-learn
+    - pytesseract
+    - azure-search-documents==11.4.b11
+    - python-dotenv
+    - pymupdf
+    - azure-ai-ml
+    - azure-identity
+    - textdistance
+    - azureml-mlflow
+    - fuzzywuzzy
+    - pillow
+    - mlflow
+    - rouge-score
+    - hnswlib
+    - pypdf
+    - langchain==0.0.325
+    - sentence-transformers
+    - azure-keyvault-secrets
+    - azureml-core
+    - unstructured
+    - unstructured[local-inference]
+    - unstructured[pdf]
+    - unstructured[all-docs]
+    - unstructured-inference
+    - mltable
+    - azureml-dataset-runtime[pandas,fuse]
+    - python-poppler
+    - opencv-contrib-python-headless
+    - opencv-python
+    - pytest==7.4.3
+    - pytest-cov==4.1.0
+    - beautifulsoup4==4.12.2
+    - lxml==4.9.3
+    - datasets==2.14.6
+    - evaluate==0.4.1
+
+

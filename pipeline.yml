@@ -1,0 +1,88 @@
+$schema: https://azuremlschemas.azureedge.net/latest/pipelineJob.schema.json
+type: pipeline
+display_name: AZURE RAG PIPELINE
+description: This pipeline ingest data into ACS using parallel execution
+experiment_name: RAG-DATA-INGESTION
+
+settings:
+  default_compute: azureml:rag-compute
+
+jobs:
+  partition_job:
+    type: command
+    compute: azureml:rag-compute
+    inputs:
+      pdfs_data_source: 
+        type: uri_folder
+        path: azureml:testpdffiles@latest
+        mode: DOWNLOAD
+      keyvault_name: researchmlops5963078644
+      num_partitions: 6
+
+    outputs:
+      tabular_output_data:
+        type: mltable
+        mode: rw_mount
+    code: .
+
+    environment: 
+      image: mcr.microsoft.com/azureml/openmpi4.1.0-ubuntu20.04
+      conda_file: conda.yaml
+
+    command: >-
+      python pipeline_components/partition_data/partition_data.py
+      --pdfs_data_source ${{inputs.pdfs_data_source}}
+      --tabular_output_data ${{outputs.tabular_output_data}}
+      --keyvault_name ${{inputs.keyvault_name}}
+      --num_partitions ${{inputs.num_partitions}}
+
+  parallel_train:
+      type: parallel
+      compute: azureml:rag-compute
+      inputs:
+        data_source: 
+          path: ${{parent.jobs.partition_job.outputs.tabular_output_data}}
+          type: mltable
+          mode: direct
+        pdfs_data_source: 
+          type: uri_folder
+          path: azureml:testpdffiles@latest
+          mode: DOWNLOAD
+        search_config: 
+          type: uri_file
+          path: search_config.json
+        keyvault_name: researchmlops5963078644
+      outputs:
+        model_folder:
+          type: uri_folder
+          mode: rw_mount
+
+      mini_batch_size: "4"
+
+      resources:
+        instance_count: 6
+
+      error_threshold: -1
+      mini_batch_error_threshold: 5
+      logging_level: "INFO"
+      input_data: ${{inputs.data_source}}
+      max_concurrency_per_instance: 2
+      retry_settings:
+        max_retries: 5
+        timeout: 12000
+
+      environment_variables:
+        "AZUREML_PARALLEL_EXAMPLE": "1a_yaml"
+
+      task:
+        type: run_function
+        code: .
+        entry_script: pipeline_components/ingest_pdf_data/ingest_pdf_data.py
+        environment:
+          image: mcr.microsoft.com/azureml/openmpi4.1.0-ubuntu20.04
+          conda_file: conda.yaml
+
+        program_arguments: >-
+          --keyvault_name ${{inputs.keyvault_name}}
+          --pdfs_data_source ${{inputs.pdfs_data_source}}
+          --search_config ${{inputs.search_config}}
