@@ -63,11 +63,11 @@ def test_get_result_from_model(mock_config, mock_azure_chat_open_ai):
     llm_result = LLMResult(generations=generation)
     mock_config().OpenAICredentials.OPENAI_API_TYPE = 'azure'
     
+
     mock_azure_chat_open_ai().generate.return_value = llm_result
 
     human_prompt = answer_relevance_instruction.format(answer="answer")
     prompt = [ChatPromptTemplate.from_messages([human_prompt]).format_messages()]
 
     result = get_result_from_model(prompt)
-
     assert result == "response"

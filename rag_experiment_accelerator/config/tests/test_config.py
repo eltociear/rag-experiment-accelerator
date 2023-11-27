@@ -7,7 +7,7 @@ from rag_experiment_accelerator.config.config import Config
 from rag_experiment_accelerator.config.auth import OpenAICredentials
 
 
-class TestEmbeddingModel:
+class EmbeddingModelMock:
     def __init__(self, model_name, dimension):
         self.model_name = model_name
         self.dimension = dimension
@@ -39,7 +39,7 @@ def test_config_init(
         openai_api_version="v1",
         openai_endpoint="http://example.com",
     )
-    mock_embeddings_model_factory.side_effect = [TestEmbeddingModel("", 123), TestEmbeddingModel("", 123) ]
+    mock_embeddings_model_factory.side_effect = [EmbeddingModelMock("", 123), EmbeddingModelMock("", 123) ]
 
     mock_openai_model_retrieve.return_value = {
         "status": "succeeded",
@@ -77,7 +77,7 @@ def test_config_init(
         mock_openai_model_retrieve.called
     )  # Ensure that the OpenAI model is retrieved
 
-
+# @patch("rag_experiment_accelerator.config.config._get_env_var", new=mock_get_env_var)
 @pytest.mark.parametrize(
     "model_status, capabilities, tags, raises_exception",
     [
@@ -143,6 +143,7 @@ def test_try_retrieve_model(model_status, capabilities, tags, raises_exception):
                 config._try_retrieve_model("model_name", tags)
 
 
+# @patch("rag_experiment_accelerator.config.config._get_env_var", new=mock_get_env_var)
 @pytest.mark.parametrize(
     "api_type, chat_model_name, embedding_model_name, chat_tags, embedding_tags",
     [
@@ -169,7 +170,7 @@ def test_check_deployment(
         patch("rag_experiment_accelerator.config.config.EmbeddingModelFactory.create") as mock_embeddings_model_factory,
     ):
         mock_try_retrieve_model.return_value = None  # Adjust as needed
-        embedding_models = [TestEmbeddingModel("", 123), TestEmbeddingModel("", 123) ]
+        embedding_models = [EmbeddingModelMock("", 123), EmbeddingModelMock("", 123) ]
         mock_embeddings_model_factory.side_effect = embedding_models
 
         config = Config("rag_experiment_accelerator/config/tests/data/test_config.json")
