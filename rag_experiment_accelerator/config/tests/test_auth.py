@@ -77,6 +77,26 @@ def test_init_invalid_api_type_openai_credentials():
             openai_endpoint="http://example.com",
         )
 
+def test_raises_when_openai_endpoint_is_none_for_azure_openai():
+    with pytest.raises(ValueError):
+        OpenAICredentials(
+            openai_api_type='azure',
+            openai_api_key="somekey",
+            openai_api_version="v1",
+            openai_endpoint=None,
+        )
+
+
+def test_raises_when_openai_api_version_is_none_for_azure_openai():
+    with pytest.raises(ValueError):
+        OpenAICredentials(
+            openai_api_type='azure',
+            openai_api_key="somekey",
+            openai_api_version=None,
+            openai_endpoint="http://example.com",
+        )
+
+
 
 @patch("rag_experiment_accelerator.config.auth._get_env_var")
 def test_from_env_openai_credentials(mock_get_env_var):
