@@ -2,6 +2,7 @@ import json
 import re
 from azure.core.credentials import AzureKeyCredential
 from azure.search.documents import SearchClient
+from rag_experiment_accelerator.ai_model.embedding.model import EmbeddingModel
 from rag_experiment_accelerator.llm.prompts import (
     prompt_instruction_title,
     prompt_instruction_summary,
@@ -14,6 +15,7 @@ from rag_experiment_accelerator.llm.prompt_execution import generate_response
 from rag_experiment_accelerator.embedding.gen_embeddings import generate_embedding
 from rag_experiment_accelerator.nlp.preprocess import Preprocess
 import pandas as pd
+from langchain_core.documents.base import Document
 
 pre_process = Preprocess()
 
@@ -74,13 +76,12 @@ def generate_summary(chunk, model_name, temperature):
 
 
 def upload_data(
-    chunks: list,
+    docs: list[Document],
     service_endpoint: str,
     index_name: str,
     search_key: str,
-    dimension: int,
     chat_model_name: str,
-    embedding_model_name: str,
+    embedding_model: EmbeddingModel,
     temperature: float,
 ):
     """
@@ -103,33 +104,27 @@ def upload_data(
     search_client = SearchClient(
         endpoint=service_endpoint, index_name=index_name, credential=credential
     )
-    documents = []
-    for i, chunk in enumerate(chunks):
-        title = generate_title(str(chunk["content"]), chat_model_name, temperature)
-        summary = generate_summary(str(chunk["content"]), chat_model_name, temperature)
+
+    for i, doc in enumerate(docs):
+        processed_content = str(pre_process.preprocess(doc.page_content))
+        title = generate_title(processed_content, chat_model_name, temperature)
+        summary = generate_summary(processed_content, chat_model_name, temperature)
+
         input_data = {
-            "id": str(my_hash(chunk["content"])),
+            "id": str(my_hash(doc.page_content)),
             "title": title,
             "summary": summary,
-            "content": str(chunk["content"]),
+            "content": doc.page_content,
+            "contentVector": embedding_model.generate_embedding(chunk=processed_content),
             "filename": "test",
-            "contentVector": chunk["content_vector"][0],
-            "contentSummary": generate_embedding(
-                size=dimension,
-                chunk=str(pre_process.preprocess(summary)),
-                model_name=embedding_model_name,
-            )[0],
-            "contentTitle": generate_embedding(
-                size=dimension,
-                chunk=str(pre_process.preprocess(title)),
-                model_name=embedding_model_name,
-            )[0],
+            "contentSummary": embedding_model.generate_embedding(chunk=str(pre_process.preprocess(summary))),
+            "contentTitle": embedding_model.generate_embedding(chunk=str(pre_process.preprocess(title))),
         }
 
-        documents.append(input_data)
+        search_client.upload_documents([input_data])
+        logger.info(f"Uploaded document {i} of {len(docs)}")
 
-        search_client.upload_documents(documents)
-        logger.info(f"Uploaded {len(documents)} documents")
+    logger.info(f"Uploaded {len(docs)} documents")
     logger.info("all documents have been uploaded to the search index")
 
 

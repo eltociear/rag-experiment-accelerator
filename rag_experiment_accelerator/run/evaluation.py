@@ -38,12 +38,12 @@ def run(config_dir: str):
 
     for config_item in config.CHUNK_SIZES:
         for overlap in config.OVERLAP_SIZES:
-            for dimension in config.EMBEDDING_DIMENSIONS:
+            for embedding_model in config.embedding_models:
                 for ef_construction in config.EF_CONSTRUCTIONS:
                     for ef_search in config.EF_SEARCHES:
-                        index_name = f"{config.NAME_PREFIX}-{config_item}-{overlap}-{dimension}-{ef_construction}-{ef_search}"
+                        index_name = f"{config.NAME_PREFIX}-{config_item}-{overlap}-{embedding_model.index_id}-{ef_construction}-{ef_search}"
                         logger.info(
-                            f"{config.NAME_PREFIX}-{config_item}-{overlap}-{dimension}-{ef_construction}-{ef_search}"
+                            f"{config.NAME_PREFIX}-{config_item}-{overlap}-{embedding_model.index_id}-{ef_construction}-{ef_search}"
                         )
                         config.artifacts_dir
                         write_path = f"{config.artifacts_dir}/outputs/eval_output_{index_name}.jsonl"
@@ -54,7 +54,7 @@ def run(config_dir: str):
                             client=client,
                             chunk_size=config_item,
                             chunk_overlap=overlap,
-                            embedding_dimension=dimension,
+                            embedding_model_name=embedding_model.name,
                             ef_construction=ef_construction,
                             ef_search=ef_search,
                         )

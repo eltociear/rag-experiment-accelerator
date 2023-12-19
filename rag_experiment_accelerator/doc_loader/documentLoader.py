@@ -6,6 +6,7 @@ from rag_experiment_accelerator.doc_loader.markdownLoader import load_markdown_f
 from rag_experiment_accelerator.doc_loader.textLoader import load_text_files
 from rag_experiment_accelerator.doc_loader.jsonLoader import load_json_files
 from rag_experiment_accelerator.doc_loader.docxLoader import load_docx_files
+from langchain_core.documents.base import Document
 
 from rag_experiment_accelerator.utils.logging import get_logger
 
@@ -34,7 +35,7 @@ def load_documents(
     folder_path: str,
     chunk_size: int,
     overlap_size: int,
-):
+)  -> list[Document]:
     """
     Load documents from a folder and process them into chunks.
 
