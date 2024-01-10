@@ -46,6 +46,6 @@
     "azure_oai_eval_deployment_name": "gpt-35-turbo",
     "openai_temperature": 0,
     "search_relevancy_threshold": 0.8,
-    "data_formats": "all",
-    "eval_data_jsonl_file_path": "./artifacts/eval_data.jsonl"
+    "data_formats": ["json"],
+    "qa_data_filepath": "./qa_data/qa_data.jsonl"
 }

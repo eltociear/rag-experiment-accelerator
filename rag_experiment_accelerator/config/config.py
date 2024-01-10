@@ -71,9 +71,12 @@ class Config:
         self.config_dir = config_dir
         self.artifacts_dir = f"{config_dir}/artifacts"
         self.data_dir = f"{config_dir}/data"
-        self.EVAL_DATA_JSONL_FILE_PATH = (
-            f"{self.config_dir}/{data['eval_data_jsonl_file_path']}"
-        )
+
+        self.qa_data_file_path = data.get("qa_data_file_path")
+        if self.qa_data_file_path is None:
+            self.qa_data_file_path = f"{self.artifacts_dir}/qa_data/qa_data.jsonl"
+        else:
+            self.qa_data_file_path = f"{self.artifacts_dir}/{data['qa_data_file_path']}"
         self.CHUNK_SIZES = data["chunking"]["chunk_size"]
         self.OVERLAP_SIZES = data["chunking"]["overlap_size"]
         self.EF_CONSTRUCTIONS = data["ef_construction"]

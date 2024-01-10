@@ -2,6 +2,8 @@ import json
 import os
 
 from dotenv import load_dotenv
+from rag_experiment_accelerator.artifact.managers.index_manager import IndexDataManager
+from rag_experiment_accelerator.artifact.models.index import Index
 
 from rag_experiment_accelerator.config import Config
 from rag_experiment_accelerator.doc_loader.documentLoader import load_documents
@@ -38,14 +40,14 @@ def run(config_dir: str) -> None:
             " ensure you have the proper permissions and try again"
         )
         raise e
-    index_dict = {"indexes": []}
 
+    indexes: list[Index] = []
     for chunk_size in config.CHUNK_SIZES:
         for overlap in config.OVERLAP_SIZES:
             for embedding_model in config.embedding_models:
                 for ef_construction in config.EF_CONSTRUCTIONS:
                     for ef_search in config.EF_SEARCHES:
-                        index_name = get_index_name(
+                        index = Index(
                             config.NAME_PREFIX,
                             chunk_size,
                             overlap,
@@ -53,21 +55,21 @@ def run(config_dir: str) -> None:
                             ef_construction,
                             ef_search,
                         )
-                        logger.info(f"Creating Index with name: {index_name}")
+
+                        logger.info(f"Creating Index with name: {index.name}")
                         create_acs_index(
                             service_endpoint,
-                            index_name,
+                            index.name,
                             key,
                             embedding_model.dimension,
                             ef_construction,
                             ef_search,
                             config.LANGUAGE["analyzers"],
                         )
-                        index_dict["indexes"].append(index_name)
+                        indexes.append(index)
 
-    index_output_file = f"{config.artifacts_dir}/generated_index_names.jsonl"
-    with open(index_output_file, "w") as index_name:
-        json.dump(index_dict, index_name, indent=4)
+    index_manager = IndexDataManager(config.artifacts_dir)
+    index_manager.save(indexes)
 
     for chunk_size in config.CHUNK_SIZES:
         for overlap in config.OVERLAP_SIZES:
@@ -77,7 +79,7 @@ def run(config_dir: str) -> None:
             for embedding_model in config.embedding_models:
                 for ef_construction in config.EF_CONSTRUCTIONS:
                     for ef_search in config.EF_SEARCHES:
-                        index_name = get_index_name(
+                        index = Index(
                             config.NAME_PREFIX,
                             chunk_size,
                             overlap,
@@ -97,7 +99,7 @@ def run(config_dir: str) -> None:
                         upload_data(
                             chunks=data_load,
                             service_endpoint=service_endpoint,
-                            index_name=index_name,
+                            index_name=index.name,
                             search_key=key,
                             embedding_model=embedding_model,
                             azure_oai_deployment_name=config.AZURE_OAI_CHAT_DEPLOYMENT_NAME,

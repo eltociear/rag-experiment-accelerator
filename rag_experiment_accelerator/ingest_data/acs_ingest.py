@@ -5,6 +5,7 @@ import re
 import pandas as pd
 from azure.core.credentials import AzureKeyCredential
 from azure.search.documents import SearchClient
+from rag_experiment_accelerator.artifact.models.qa_data import QAData
 from rag_experiment_accelerator.embedding.embedding_model import EmbeddingModel
 from rag_experiment_accelerator.llm.prompts import (
     do_need_multiple_prompt_instruction,
@@ -133,8 +134,9 @@ def generate_qna(docs, azure_oai_deployment_name):
     Returns:
         pandas.DataFrame: A DataFrame containing the generated questions, answers, and context for each document.
     """
-    column_names = ["user_prompt", "output_prompt", "context"]
-    new_df = pd.DataFrame(columns=column_names)
+    # column_names = ["user_prompt", "output_prompt", "context"]
+    # new_df = pd.DataFrame(columns=column_names)
+    data_load = []
 
     for i, chunk in enumerate(docs):
         if len(chunk.page_content) > 50:
@@ -153,13 +155,8 @@ def generate_qna(docs, azure_oai_deployment_name):
                         user_prompt = item["content"]
                     if item["role"] == "assistant":
                         output_prompt = item["content"]
-
-                data = {
-                    "user_prompt": user_prompt,
-                    "output_prompt": output_prompt,
-                    "context": chunk.page_content,
-                }
-                new_df = new_df._append(data, ignore_index=True)
+                data = QAData(user_prompt, output_prompt, chunk.page_content)
+                data_load.append(data)
                 logger.info(f"Generated QnA for document {i}")
             except Exception as e:
                 logger.error(
@@ -169,7 +166,7 @@ def generate_qna(docs, azure_oai_deployment_name):
                 logger.debug(e)
                 logger.debug(f"LLM Response: {response}")
 
-    return new_df
+    return data_load
 
 
 def we_need_multiple_questions(question, azure_oai_deployment_name):
