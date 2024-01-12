@@ -7,5 +7,8 @@ class Artifact(ABC):
         return self.__dict__
 
     @classmethod
-    def from_dict(cls, data: dict) -> Self:
-        return cls(**data)
+    def create(cls, data: dict | str) -> Self:
+        if type(data) == dict:
+            return cls(**data)
+        else:
+            return cls(data)

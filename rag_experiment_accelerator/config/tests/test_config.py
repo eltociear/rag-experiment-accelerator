@@ -63,8 +63,8 @@ def test_config_init():
     )
     assert config.DATA_FORMATS == mock_config_data["data_formats"]
     assert (
-        config.EVAL_DATA_JSONL_FILE_PATH
-        == f"{get_test_config_dir()}/{mock_config_data['eval_data_jsonl_file_path']}"
+        config.qa_data_file_path
+        == f"{get_test_config_dir()}/{mock_config_data['qa_data_file_path']}"
     )
 
     st_embedding_model = config.embedding_models[0]

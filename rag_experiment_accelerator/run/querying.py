@@ -1,17 +1,15 @@
 import json
-import os
 
-import azure
 from azure.search.documents import SearchClient
 from dotenv import load_dotenv
 from openai import BadRequestError
-from rag_experiment_accelerator.artifact.managers.qa_data_manager import QADataManager
-from rag_experiment_accelerator.artifact.managers.query_data_manager import (
-    QueryDataManager,
-)
-from rag_experiment_accelerator.artifact.models.index import Index
-from rag_experiment_accelerator.artifact.models.query_data import QueryData
 
+from rag_experiment_accelerator.artifact.loaders.qa_data_loader import QADataLoader
+from rag_experiment_accelerator.artifact.models.index_data import IndexData
+from rag_experiment_accelerator.artifact.models.query_data import QueryData
+from rag_experiment_accelerator.artifact.writers.query_data_writer import (
+    QueryDataWriter,
+)
 from rag_experiment_accelerator.config import Config
 from rag_experiment_accelerator.data_assets.data_asset import create_data_asset
 from rag_experiment_accelerator.embedding.embedding_model import EmbeddingModel
@@ -253,11 +251,11 @@ def run(config_dir: str):
     config = Config(config_dir)
     service_endpoint = config.AzureSearchCredentials.AZURE_SEARCH_SERVICE_ENDPOINT
     search_admin_key = config.AzureSearchCredentials.AZURE_SEARCH_ADMIN_KEY
-    qa_data_manager = QADataManager(config.qa_data_file_path)
-    qa_data_load = qa_data_manager.loads()
+    qa_data_loader = QADataLoader(config.qa_data_file_path)
+    qa_data_load = qa_data_loader.load_all()
     question_count = len(qa_data_load)
 
-    query_data_manager = QueryDataManager(config.artifacts_dir)
+    query_data_writer = QueryDataWriter(config.query_data_dir)
     # ensure we have a valid Azure credential before going throught the loop.
     azure_cred = get_default_az_cred()
     try:
@@ -276,27 +274,33 @@ def run(config_dir: str):
         #     raise e
 
         evaluator = SpacyEvaluator(config.SEARCH_RELEVANCY_THRESHOLD)
+        # variants = 0
+        # index_data_manager = IndexDataLoader(config.artifacts_dir)
+        # variants = index_data_manager.get_variant_count(config)
+        # expected_query_data_count = question_count * variants
+        # for chunk_size in config.CHUNK_SIZES:
+        #     for overlap in config.OVERLAP_SIZES:
+        #         for embedding_model in config.embedding_models:
+        #             for ef_construction in config.EF_CONSTRUCTIONS:
+        #                 for ef_search in config.EF_SEARCHES:
+        #                     variants += 1
 
         for chunk_size in config.CHUNK_SIZES:
             for overlap in config.OVERLAP_SIZES:
                 for embedding_model in config.embedding_models:
                     for ef_construction in config.EF_CONSTRUCTIONS:
                         for ef_search in config.EF_SEARCHES:
-                            index = Index(
-                                config.NAME_PREFIX,
-                                chunk_size,
-                                overlap,
-                                embedding_model.name,
-                                ef_construction,
-                                ef_search,
+                            index = IndexData(
+                                prefix=config.NAME_PREFIX,
+                                chunk_size=chunk_size,
+                                overlap=overlap,
+                                embedding_model_name=embedding_model.name,
+                                ef_construction=ef_construction,
+                                ef_search=ef_search,
                             )
                             logger.info(f"Index: {index.name}")
 
-                            # write_path = f"{output_dir}/eval_output_{index_name}.jsonl"
-                            query_data_manager.archive(index.name)
-
-                            # if os.path.exists(write_path):
-                            #     continue
+                            query_data_writer.handle_archive(index.name)
 
                             search_client = create_client(
                                 service_endpoint, index.name, search_admin_key
@@ -399,13 +403,10 @@ def run(config_dir: str):
                                             search_evals=search_evals,
                                             context=qa.context,
                                         )
-                                        query_data_manager.save(
+                                        query_data_writer.save(
                                             index_name=index.name, data=output
                                         )
 
-                                        # with open(write_path, "a") as out:
-                                        #     json_string = json.dumps(output)
-                                        #     out.write(json_string + "\n")
                                 except BadRequestError as e:
                                     logger.error(
                                         "Invalid request. Skipping"
@@ -416,7 +417,7 @@ def run(config_dir: str):
 
                             search_client.close()
                             create_data_asset(
-                                query_data_manager.get_output_filepath(index.name),
+                                query_data_writer.get_output_filepath(index.name),
                                 index.name,
                                 azure_cred,
                                 config.AzureMLCredentials,

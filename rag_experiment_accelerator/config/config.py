@@ -73,10 +73,16 @@ class Config:
         self.data_dir = f"{config_dir}/data"
 
         self.qa_data_file_path = data.get("qa_data_file_path")
+        qa_data_dir = "qa_data"
         if self.qa_data_file_path is None:
-            self.qa_data_file_path = f"{self.artifacts_dir}/qa_data/qa_data.jsonl"
+            self.qa_data_file_path = f"{self.artifacts_dir}/{qa_data_dir}/qa_data.jsonl"
         else:
-            self.qa_data_file_path = f"{self.artifacts_dir}/{data['qa_data_file_path']}"
+            self.qa_data_file_path = f"{self.config_dir}/{data['qa_data_file_path']}"
+
+        self.query_data_dir = f"{self.artifacts_dir}/query_data"
+        self.index_data_dir = f"{self.artifacts_dir}/index_data"
+        self.eval_data_dir = f"{self.artifacts_dir}/eval_data"
+
         self.CHUNK_SIZES = data["chunking"]["chunk_size"]
         self.OVERLAP_SIZES = data["chunking"]["overlap_size"]
         self.EF_CONSTRUCTIONS = data["ef_construction"]

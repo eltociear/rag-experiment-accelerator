@@ -1,17 +1,18 @@
-import json
-import os
-
 from dotenv import load_dotenv
-from rag_experiment_accelerator.artifact.managers.index_manager import IndexDataManager
-from rag_experiment_accelerator.artifact.models.index import Index
 
+from rag_experiment_accelerator.artifact.loaders.index_data_loader import (
+    IndexDataLoader,
+)
+from rag_experiment_accelerator.artifact.models.index_data import IndexData
+from rag_experiment_accelerator.artifact.writers.index_data_writer import (
+    IndexDataWriter,
+)
 from rag_experiment_accelerator.config import Config
 from rag_experiment_accelerator.doc_loader.documentLoader import load_documents
 from rag_experiment_accelerator.ingest_data.acs_ingest import upload_data
 from rag_experiment_accelerator.init_Index.create_index import create_acs_index
 from rag_experiment_accelerator.nlp.preprocess import Preprocess
 from rag_experiment_accelerator.utils.logging import get_logger
-from rag_experiment_accelerator.utils.utils import get_index_name
 
 load_dotenv(override=True)
 
@@ -32,22 +33,13 @@ def run(config_dir: str) -> None:
     service_endpoint = config.AzureSearchCredentials.AZURE_SEARCH_SERVICE_ENDPOINT
     key = config.AzureSearchCredentials.AZURE_SEARCH_ADMIN_KEY
 
-    try:
-        os.makedirs(config.artifacts_dir, exist_ok=True)
-    except Exception as e:
-        logger.error(
-            f"Unable to create the '{config.artifacts_dir}' directory. Please"
-            " ensure you have the proper permissions and try again"
-        )
-        raise e
-
-    indexes: list[Index] = []
+    indexes: list[IndexData] = []
     for chunk_size in config.CHUNK_SIZES:
         for overlap in config.OVERLAP_SIZES:
             for embedding_model in config.embedding_models:
                 for ef_construction in config.EF_CONSTRUCTIONS:
                     for ef_search in config.EF_SEARCHES:
-                        index = Index(
+                        index = IndexData(
                             config.NAME_PREFIX,
                             chunk_size,
                             overlap,
@@ -68,8 +60,14 @@ def run(config_dir: str) -> None:
                         )
                         indexes.append(index)
 
-    index_manager = IndexDataManager(config.artifacts_dir)
-    index_manager.save(indexes)
+    writer = IndexDataWriter(config.index_data_dir)
+    loader = IndexDataLoader(config.index_data_dir)
+
+    prev_indexes = loader.load_all()
+    if prev_indexes is not None:
+        writer.handle_archive(indexes, prev_indexes)
+
+    writer.save_all(indexes)
 
     for chunk_size in config.CHUNK_SIZES:
         for overlap in config.OVERLAP_SIZES:
@@ -79,7 +77,7 @@ def run(config_dir: str) -> None:
             for embedding_model in config.embedding_models:
                 for ef_construction in config.EF_CONSTRUCTIONS:
                     for ef_search in config.EF_SEARCHES:
-                        index = Index(
+                        index = IndexData(
                             config.NAME_PREFIX,
                             chunk_size,
                             overlap,

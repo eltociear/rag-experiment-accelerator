@@ -2,6 +2,7 @@ import mlflow
 from azure.ai.ml import MLClient
 from dotenv import load_dotenv
 
+from rag_experiment_accelerator.artifact.models.index_data import IndexData
 from rag_experiment_accelerator.config import Config
 from rag_experiment_accelerator.evaluation import eval
 from rag_experiment_accelerator.utils.auth import get_default_az_cred
@@ -43,7 +44,7 @@ def run(config_dir: str):
             for embedding_model in config.embedding_models:
                 for ef_construction in config.EF_CONSTRUCTIONS:
                     for ef_search in config.EF_SEARCHES:
-                        index_name = get_index_name(
+                        index = IndexData(
                             config.NAME_PREFIX,
                             chunk_size,
                             overlap,
@@ -51,12 +52,10 @@ def run(config_dir: str):
                             ef_construction,
                             ef_search,
                         )
-                        logger.info(f"Evaluating Index: {index_name}")
-                        config.artifacts_dir
-                        write_path = f"{config.artifacts_dir}/outputs/eval_output_{index_name}.jsonl"
+                        logger.info(f"Evaluating Index: {index.name}")
                         eval.evaluate_prompts(
                             exp_name=config.NAME_PREFIX,
-                            data_path=write_path,
+                            index_name=index.name,
                             config=config,
                             client=client,
                             chunk_size=chunk_size,

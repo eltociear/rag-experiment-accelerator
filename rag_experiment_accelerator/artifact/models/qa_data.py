@@ -1,4 +1,3 @@
-from typing import Self
 from rag_experiment_accelerator.artifact.models.artifact import Artifact
 
 

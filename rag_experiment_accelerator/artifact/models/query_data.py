@@ -29,20 +29,3 @@ class QueryData(Artifact):
         self.search_type = search_type
         self.search_evals = search_evals
         self.context = context
-
-    # @classmethod
-    # def from_dict(cls, data: dict) -> Self:
-    #     return cls(
-    #         rerank=data["rerank"],
-    #         rerank_type=data["rerank_type"],
-    #         crossencoder_model=data["crossencoder_model"],
-    #         llm_re_rank_threshold=data["llm_re_rank_threshold"],
-    #         retrieve_num_of_documents=data["retrieve_num_of_documents"],
-    #         cross_encoder_at_k=data["cross_encoder_at_k"],
-    #         question_count=data["question_count"],
-    #         actual=data["actual"],
-    #         expected=data["expected"],
-    #         search_type=data["search_type"],
-    #         search_evals=data["search_evals"],
-    #         context=data["context"],
-    #     )

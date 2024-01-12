@@ -1,8 +1,8 @@
 import os
 
 from dotenv import load_dotenv
-from rag_experiment_accelerator.artifact.managers.qa_data_manager import QADataManager
 
+from rag_experiment_accelerator.artifact.writers.qa_data_writer import QADataWriter
 from rag_experiment_accelerator.config import Config
 from rag_experiment_accelerator.data_assets.data_asset import create_data_asset
 from rag_experiment_accelerator.doc_loader.documentLoader import load_documents
@@ -36,16 +36,11 @@ def run(config_dir: str):
         )
         raise e
 
-    # generate qna
     qa_data = generate_qna(all_docs, config.AZURE_OAI_CHAT_DEPLOYMENT_NAME)
-    qa_data_manager = QADataManager(config.qa_data_file_path)
-    qa_data_manager.archive()
-    for data in qa_data:
-        qa_data_manager.save(data)
-    # qa_data_manager.save_all(qa_data)
-    # write to jsonl
-    # df.to_json(config.EVAL_DATA_JSONL_FILE_PATH, orient="records", lines=True)
-    # create data asset in mlstudio
+    writer = QADataWriter(config.qa_data_file_path)
+    writer.handle_archive()
+    writer.save_all(qa_data)
+
     create_data_asset(
         config.qa_data_file_path,
         "eval_data",

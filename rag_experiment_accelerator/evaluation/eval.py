@@ -17,8 +17,14 @@ from fuzzywuzzy import fuzz
 from numpy import mean
 from sentence_transformers import SentenceTransformer
 from sklearn.metrics.pairwise import cosine_similarity
+from rag_experiment_accelerator.artifact.loaders.query_data_loader import (
+    QueryDataLoader,
+)
+from rag_experiment_accelerator.artifact.models.index_data import IndexData
+from rag_experiment_accelerator.artifact.writers.eval_data_writer import EvalDataWriter
 
 from rag_experiment_accelerator.config import Config
+from rag_experiment_accelerator.embedding.embedding_model import EmbeddingModel
 from rag_experiment_accelerator.llm.prompts import (
     llm_answer_relevance_instruction,
     llm_context_precision_instruction,
@@ -549,15 +555,15 @@ def compute_metrics(actual, expected, context, metric_type):
 
 
 def evaluate_prompts(
-    exp_name,
-    data_path,
-    config,
-    client,
-    chunk_size,
-    chunk_overlap,
-    embedding_model,
-    ef_construction,
-    ef_search,
+    exp_name: str,
+    index_name: str,
+    config: Config,
+    client: mlflow.MlflowClient,
+    chunk_size: int,
+    chunk_overlap: int,
+    embedding_model: EmbeddingModel,
+    ef_construction: int,
+    ef_search: int,
 ):
     """
     Evaluates prompts using various metrics and logs the results to MLflow.
@@ -576,16 +582,6 @@ def evaluate_prompts(
     Returns:
         None
     """
-    try:
-        eval_score_folder = f"{config.artifacts_dir}/eval_score"
-        os.makedirs(eval_score_folder, exist_ok=True)
-    except Exception as e:
-        logger.error(
-            f"Unable to create the '{eval_score_folder}' directory. Please"
-            " ensure you have the proper permissions and try again"
-        )
-        raise e
-
     metric_types = config.METRIC_TYPES
     num_search_type = config.SEARCH_VARIANTS
     data_list = []
@@ -598,52 +594,40 @@ def evaluate_prompts(
     total_precision_scores_by_search_type = {}
     map_scores_by_search_type = {}
     average_precision_for_search_type = {}
-    with open(data_path, "r") as file:
-        for line in file:
-            data = json.loads(line)
-            actual = data.get("actual")
-            expected = data.get("expected")
-            search_type = data.get("search_type")
-            rerank = data.get("rerank")
-            rerank_type = data.get("rerank_type")
-            crossencoder_model = data.get("crossencoder_model")
-            llm_re_rank_threshold = data.get("llm_re_rank_threshold")
-            retrieve_num_of_documents = data.get("retrieve_num_of_documents")
-            cross_encoder_at_k = data.get("cross_encoder_at_k")
-            question_count = data.get("question_count")
-            search_evals = data.get("search_evals")
-            context = data.get("context")
 
-            actual = remove_spaces(lower(actual))
-            expected = remove_spaces(lower(expected))
+    loader = QueryDataLoader(config.query_data_dir)
+    query_data_load = loader.load_all(index_name)
+    for data in query_data_load:
+        actual = remove_spaces(lower(data.actual))
+        expected = remove_spaces(lower(data.expected))
 
-            metric_dic = {}
+        metric_dic = {}
 
-            for metric_type in metric_types:
-                score = compute_metrics(actual, expected, context, metric_type)
-                metric_dic[metric_type] = score
-            metric_dic["actual"] = actual
-            metric_dic["expected"] = expected
-            metric_dic["search_type"] = search_type
-            data_list.append(metric_dic)
+        for metric_type in metric_types:
+            score = compute_metrics(actual, expected, data.context, metric_type)
+            metric_dic[metric_type] = score
+        metric_dic["actual"] = actual
+        metric_dic["expected"] = expected
+        metric_dic["search_type"] = data.search_type
+        data_list.append(metric_dic)
 
-            if not total_precision_scores_by_search_type.get(search_type):
-                total_precision_scores_by_search_type[search_type] = {}
-                map_scores_by_search_type[search_type] = []
-                average_precision_for_search_type[search_type] = []
-            for eval in search_evals:
-                scores = eval.get("precision_scores")
-                if scores:
-                    average_precision_for_search_type[search_type].append(mean(scores))
-                for i, score in enumerate(scores):
-                    if total_precision_scores_by_search_type[search_type].get(i + 1):
-                        total_precision_scores_by_search_type[search_type][
-                            i + 1
-                        ].append(score)
-                    else:
-                        total_precision_scores_by_search_type[search_type][i + 1] = [
-                            score
-                        ]
+        if not total_precision_scores_by_search_type.get(data.search_type):
+            total_precision_scores_by_search_type[data.search_type] = {}
+            map_scores_by_search_type[data.search_type] = []
+            average_precision_for_search_type[data.search_type] = []
+        for eval in data.search_evals:
+            scores = eval.get("precision_scores")
+            if scores:
+                average_precision_for_search_type[data.search_type].append(mean(scores))
+            for i, score in enumerate(scores):
+                if total_precision_scores_by_search_type[data.search_type].get(i + 1):
+                    total_precision_scores_by_search_type[data.search_type][
+                        i + 1
+                    ].append(score)
+                else:
+                    total_precision_scores_by_search_type[data.search_type][i + 1] = [
+                        score
+                    ]
 
     eval_scores_df = {"search_type": [], "k": [], "score": [], "map_at_k": []}
 
@@ -667,61 +651,78 @@ def evaluate_prompts(
         mean_scores["mean"].append(mean(scores))
 
     run_id = mlflow.active_run().info.run_id
+
+    eval_data_writer = EvalDataWriter(config.artifacts_dir)
+    # archive data if needed
+    eval_data_writer.handle_archive()
+
+    # save all data to csv and log to mlflow
+    all_data_df = pd.DataFrame(data_list)
+    all_data_filename = f"{formatted_datetime}.csv"
+    eval_data_writer.save_artifact(all_data_df, all_data_filename, index=False)
+    mlflow.log_artifact(f"{eval_data_writer.directory}/{all_data_filename}")
+    logger.debug(f"Eval scores: {all_data_df.head()}")
+
+    # make search charts
     columns_to_remove = ["actual", "expected"]
-    additional_columns_to_remove = ["search_type"]
-    df = pd.DataFrame(data_list)
-    df.to_csv(f"{eval_score_folder}/{formatted_datetime}.csv", index=False)
-    logger.debug(f"Eval scores: {df.head()}")
-
-    temp_df = df.drop(columns=columns_to_remove)
-    draw_search_chart(temp_df, run_id, client)
-
-    temp_df = temp_df.drop(columns=additional_columns_to_remove)
+    search_df = all_data_df.drop(columns=columns_to_remove)
+    draw_search_chart(search_df, run_id, client)
 
     if isinstance(num_search_type, str):
         num_search_type = [num_search_type]
-    sum_all_columns = temp_df.sum() / (question_count * len(num_search_type))
+
+    # create search comparison across metric types dataframe
+    additional_columns_to_remove = ["search_type"]
+    temp_df = search_df.drop(columns=additional_columns_to_remove)
+    sum_all_columns = temp_df.sum() / (data.question_count * len(num_search_type))
     sum_df = pd.DataFrame([sum_all_columns], columns=temp_df.columns)
 
     sum_dict = {}
     for col_name in sum_df.columns:
         sum_dict[col_name] = float(sum_df[col_name].values)
 
-    sum_df.to_csv(f"{eval_score_folder}/sum_{formatted_datetime}.csv", index=False)
+    # save sum dataframe and log to mlflow
+    sum_filename = f"sum_{formatted_datetime}.csv"
+    eval_data_writer.save_artifact(sum_df, sum_filename, index=False)
+    mlflow.log_artifact(f"{eval_data_writer.directory}/{sum_filename}")
+    # draw sum histogram
+    draw_hist_df(sum_df, run_id, client)
 
+    # save and plot apk and mapk scores
     ap_scores_df = pd.DataFrame(eval_scores_df)
-    ap_scores_df.to_csv(
-        f"{eval_score_folder}/{formatted_datetime}_ap_scores_at_k_test.csv",
-        index=False,
+    eval_data_writer.save_artifact(
+        ap_scores_df, f"{formatted_datetime}_ap_scores_at_k_test.csv", index=False
     )
     plot_apk_scores(ap_scores_df, run_id, client)
     plot_mapk_scores(ap_scores_df, run_id, client)
 
+    # save and plot map scores
     map_scores_df = pd.DataFrame(mean_scores)
-    map_scores_df.to_csv(
-        f"{eval_score_folder}/{formatted_datetime}_map_scores_test.csv",
-        index=False,
+    eval_data_writer.save_artifact(
+        map_scores_df, f"{formatted_datetime}_map_scores_test.csv", index=False
     )
     plot_map_scores(map_scores_df, run_id, client)
 
     mlflow.log_param("chunk_size", chunk_size)
-    mlflow.log_param("question_count", question_count)
-    mlflow.log_param("rerank", rerank)
-    mlflow.log_param("rerank_type", rerank_type)
-    mlflow.log_param("crossencoder_model", crossencoder_model)
-    mlflow.log_param("llm_re_rank_threshold", llm_re_rank_threshold)
-    mlflow.log_param("retrieve_num_of_documents", retrieve_num_of_documents)
-    mlflow.log_param("cross_encoder_at_k", cross_encoder_at_k)
+    mlflow.log_param("question_count", data.question_count)
+    mlflow.log_param("rerank", data.rerank)
+    mlflow.log_param("rerank_type", data.rerank_type)
+    mlflow.log_param("crossencoder_model", data.crossencoder_model)
+    mlflow.log_param("llm_re_rank_threshold", data.llm_re_rank_threshold)
+    mlflow.log_param("retrieve_num_of_documents", data.retrieve_num_of_documents)
+    mlflow.log_param("cross_encoder_at_k", data.cross_encoder_at_k)
     mlflow.log_param("chunk_overlap", chunk_overlap)
     mlflow.log_param("embedding_dimension", embedding_model.dimension)
     mlflow.log_param("embedding_model_name", embedding_model.name)
     mlflow.log_param("ef_construction", ef_construction)
     mlflow.log_param("ef_search", ef_search)
-    mlflow.log_param("run_metrics", sum_dict)
+    # mlflow.log_param("run_metrics", sum_dict)
     mlflow.log_metrics(sum_dict)
-    mlflow.log_artifact(f"{eval_score_folder}/{formatted_datetime}.csv")
-    mlflow.log_artifact(f"{eval_score_folder}/sum_{formatted_datetime}.csv")
-    draw_hist_df(sum_df, run_id, client)
+    # mlflow.log_artifact(f"{eval_data_writer.directory}/{all_data_filename}")
+    # mlflow.log_artifact(f"{eval_data_writer.directory}/{sum_filename}")
+    # mlflow.log_artifact(f"{eval_score_folder}/{formatted_datetime}.csv")
+    # mlflow.log_artifact(f"{eval_score_folder}/sum_{formatted_datetime}.csv")
+    # draw_hist_df(sum_df, run_id, client)
     generate_metrics(exp_name, run_id, client)
     mlflow.end_run()
 
