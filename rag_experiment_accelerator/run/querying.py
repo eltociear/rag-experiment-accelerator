@@ -19,10 +19,7 @@ from rag_experiment_accelerator.evaluation.search_eval import (
 from rag_experiment_accelerator.evaluation.spacy_evaluator import (
     SpacyEvaluator,
 )
-from rag_experiment_accelerator.utils.auth import get_default_az_cred
-from rag_experiment_accelerator.evaluation.spacy_evaluator import (
-    SpacyEvaluator,
-)
+
 from rag_experiment_accelerator.ingest_data.acs_ingest import (
     do_we_need_multiple_questions,
     we_need_multiple_questions,
@@ -45,7 +42,6 @@ from rag_experiment_accelerator.search_type.acs_search_methods import (
 )
 from rag_experiment_accelerator.utils.auth import get_default_az_cred
 from rag_experiment_accelerator.utils.logging import get_logger
-from rag_experiment_accelerator.utils.utils import get_index_name
 
 load_dotenv(override=True)
 
@@ -65,7 +61,7 @@ search_mapping = {
 
 
 def query_acs(
-    search_client: azure.search.documents.SearchClient,
+    search_client: SearchClient,
     embedding_model: EmbeddingModel,
     user_prompt: str,
     s_v: str,
@@ -75,7 +71,7 @@ def query_acs(
     Queries the Azure Cognitive Search service using the specified search client and search parameters.
 
     Args:
-        search_client (azure.search.documents.SearchClient): The Azure Cognitive Search client to use for querying the service.
+        search_client (SearchClient): The Azure Cognitive Search client to use for querying the service.
         embedding_model (EmbeddingModel): The model used to generate the embeddings.
         user_prompt (str): The user's search query.
         s_v (str): The version of the search service to use.
@@ -259,31 +255,7 @@ def run(config_dir: str):
     # ensure we have a valid Azure credential before going throught the loop.
     azure_cred = get_default_az_cred()
     try:
-        # with open(config.EVAL_DATA_JSONL_FILE_PATH, "r") as file:
-        #     for line in file:
-        #         question_count += 1
-
-        # try:
-        #     output_dir = f"{config.artifacts_dir}/outputs"
-        #     os.makedirs(output_dir, exist_ok=True)
-        # except Exception as e:
-        #     logger.error(
-        #         f"Unable to create the '{output_dir}' directory. Please ensure"
-        #         " you have the proper permissions and try again"
-        #     )
-        #     raise e
-
         evaluator = SpacyEvaluator(config.SEARCH_RELEVANCY_THRESHOLD)
-        # variants = 0
-        # index_data_manager = IndexDataLoader(config.artifacts_dir)
-        # variants = index_data_manager.get_variant_count(config)
-        # expected_query_data_count = question_count * variants
-        # for chunk_size in config.CHUNK_SIZES:
-        #     for overlap in config.OVERLAP_SIZES:
-        #         for embedding_model in config.embedding_models:
-        #             for ef_construction in config.EF_CONSTRUCTIONS:
-        #                 for ef_search in config.EF_SEARCHES:
-        #                     variants += 1
 
         for chunk_size in config.CHUNK_SIZES:
             for overlap in config.OVERLAP_SIZES:
